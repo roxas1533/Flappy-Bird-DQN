@@ -8,9 +8,9 @@ import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Conv2D, Flatten
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.losses import Huber
 from tensorflow.keras.optimizers import Adam
 from tensorflow_core.python import he_normal
+from tensorflow_core.python.keras.losses import Huber
 
 import Flappy
 
@@ -53,11 +53,11 @@ class Memory:
 
 modelLoad = True
 
-E_START = 1.0
-E_STOP = 0.01
+E_START = 0.1
+E_STOP = 0.0001
 E_DECAY_RATE = 0.00001
 BATCH_SIZE = 32
-REPLAY_MEMORY = 5000
+REPLAY_MEMORY = 50000
 env = Flappy.FlappyClass()
 state_size = env.observation_space.shape
 action_size = env.action_space.n
@@ -95,17 +95,23 @@ while True:
     if f:
         break
     target_qn.model.set_weights(main_qn.model.get_weights())
+    reward_sum = 0
+    loss = 0
+    action = 0
     for _ in range(1, 2000):
         step += 1
         total_step += 1
         if epsilon > E_STOP and total_step > 3200:
             epsilon -= (E_START - E_STOP) / 3000000
-        if epsilon > np.random.rand():
-            action = env.action_space.sample()
-        else:
-            action = np.argmax(main_qn.model.predict(state)[0])
+
+        if step % 2 == 1:
+            if epsilon > np.random.rand():
+                action = env.action_space.sample()
+            else:
+                action = np.argmax(main_qn.model.predict(state)[0])
 
         next_state, reward, done, temp = env.step(action)
+        reward_sum += reward
         f = temp.pop()
         if f:
             Flappy.pygame.quit()
@@ -127,19 +133,26 @@ while True:
             state_t = np.concatenate(state_t)
             state_t1 = np.concatenate(state_t1)
             targets = main_qn.model.predict(state_t)
-            Q_sa = main_qn.model.predict(state_t1)
+            Q_sa = target_qn.model.predict(state_t1)
             # 採った行動の価値を計算
             targets[range(BATCH_SIZE), action_t] = reward_t + 0.99 * np.max(Q_sa, axis=1) * np.invert(terminal)
 
             # 行動価値関数の更新
-            main_qn.model.train_on_batch(state_t, targets)
+            loss += main_qn.model.train_on_batch(state_t, targets)
+
+            if episode % 100 == 0:
+                target_qn.model.set_weights(main_qn.model.get_weights())
+            # print('累計ステップ: {},ACTION: {},epsilon: {:.4f},reward:{:.3f},loss:{:.3f}'.format(total_step, action, epsilon
+            #                                                                                , reward,
+            #                                                                                loss))
         state = s_t1
         if done:
             break
 
     # エピソード完了時のログ表示
-    print('エピソード: {}, ステップ数: {}, 累計ステップ: {},epsilon: {:.4f},reward:{:.3f}'.format(episode, step, total_step,
-                                                                                  epsilon, reward))
+    print('エピソード: {}, ステップ数: {}, 累計ステップ: {},epsilon: {:.4f},reward:{:.3f},loss:{:.3f}'.format(episode, step, total_step,
+                                                                                              epsilon, reward_sum,
+                                                                                              loss))
     history.append(step)
 
     # 環境のリセット
@@ -149,10 +162,10 @@ while True:
 
 plt.plot(history)
 plt.show()
-main_qn.model.save_weights("model.h5", overwrite=True)
-with open('epsilon.dat', 'wb') as fp:
-    pickle.dump(epsilon, fp)
-with open('total_step.dat', 'wb') as fp:
-    pickle.dump(total_step, fp)
-with open('exp.dat', 'wb') as fp:
-    pickle.dump(memory, fp)
+# main_qn.model.save_weights("model.h5", overwrite=True)
+# with open('epsilon.dat', 'wb') as fp:
+#     pickle.dump(epsilon, fp)
+# with open('total_step.dat', 'wb') as fp:
+#     pickle.dump(total_step, fp)
+# with open('exp.dat', 'wb') as fp:
+#     pickle.dump(memory, fp)

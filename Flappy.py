@@ -34,7 +34,7 @@ class Box:
 
 
 class Player(Box):
-    G = 0.5
+    G = 1
 
     def __init__(self, x, y, width, height):
         global flappyBird
@@ -53,11 +53,15 @@ class Player(Box):
         self.time += 1
         super().update()
         self.veloY += self.G
+        self.veloY = max(self.veloY, -8)
+        self.veloY = min(self.veloY, 10)
+        # if self.y < 0:
+        #     self.y = 0
         if self.y < 0 or self.y + self.height > HEIGHT:
             self.isDeath = True
 
     def jump(self):
-        self.veloY = -12
+        self.veloY = -9
 
     def do(self, X):
         type = np.random.choice(2, p=out)
@@ -76,7 +80,7 @@ class Object(Box):
     def __init__(self, x, y, width, height, tag):
         global pipe
         super().__init__(x, y, width, height)
-        self.veloX = -3
+        self.veloX = -4
         self.tag = "OUT"
         self.tag2 = tag
         t = pipe.get_width() / width
@@ -96,13 +100,14 @@ class Object(Box):
 
 class NextPoint(Box):
     def draw(self, pygame, screen):
-        pygame.draw.rect(screen, (255, 255, 255), (int(self.x), int(self.y), self.width, self.height), 0)
+        # pygame.draw.rect(screen, (255, 255, 255), (int(self.x), int(self.y), self.width, self.height), 0)
+        pass
 
 
 class Dummy(Box):
     def __init__(self, x, y, width, height):
         super().__init__(x, y, width, height)
-        self.veloX = -3
+        self.veloX = -4
         self.tag = "OK"
         self.tag2 = "no"
 
@@ -113,7 +118,7 @@ class Dummy(Box):
 class FlappyClass(gym.Env):
     def __init__(self):
         self.done = True
-        self.player = Player(100, HEIGHT / 2, 15, 15)
+        self.player = Player(100, HEIGHT / 2, 25, 25)
         self.objects = []
         self.min = 1000
         self.time = 0
@@ -140,7 +145,7 @@ class FlappyClass(gym.Env):
             self.isInited = True
         for event in pygame.event.get():  # 終了処理
             if event.type == KEYDOWN:
-                self.player.veloY = -7
+                self.player.jump()
             if event.type == QUIT:
                 self.finish = True
                 break
@@ -152,16 +157,15 @@ class FlappyClass(gym.Env):
         # self.screen.blit(f, (self.player.x, self.player.y))
         self.player.draw(pygame=pygame, screen=self.screen)
         self.point.draw(pygame=pygame, screen=self.screen)
-        pygame.display.flip()
-        # self.clock.tick(60)
+        pygame.display.update()
 
     def step(self, action):
         done = False
         pointFlag = False
         self.reward = 0.1
         if action == 1:
-            self.player.veloY = -5
-        for i, o in enumerate(self.objects):
+            self.player.jump()
+        for o in self.objects[:]:
             o.update()
             if 0 < (o.x + o.width - self.player.x) and not pointFlag and o.tag2 == "UP":
                 self.min = o.x + o.width - self.player.x
@@ -184,7 +188,9 @@ class FlappyClass(gym.Env):
             done = True
 
         if self.time % 50 == 0:
-            rand = int(np.random.rand() * (HEIGHT - 150))
+            rand = 0
+            while rand == 0:
+                rand = int(np.random.rand() * (HEIGHT - 150))
             # rand = 100
             self.objects.append(Object(WIDTH, 0, 40, rand, tag="UP"))
             self.objects.append(Object(WIDTH, rand + 120, 40, HEIGHT, tag="DOWN"))
@@ -192,10 +198,12 @@ class FlappyClass(gym.Env):
         self.time += 1
         if not self.finish:
             self.render()
+        self.clock.tick(30)
+
         return self.WriteState(), self.reward, done, {self.finish}
 
     def reset(self):
-        self.player = Player(100, HEIGHT / 2, 20, 20)
+        self.player = Player(100, HEIGHT / 2, 25, 25)
         self.point = NextPoint(0, 0, 5, 5)
         self.objects = []
         self.time = 0
@@ -233,6 +241,7 @@ if __name__ == "__main__":
     flappy = FlappyClass()
     flappy.reset()
     while True:
+
         _, _, done, f = flappy.step(0)
         if f.pop():
             break
