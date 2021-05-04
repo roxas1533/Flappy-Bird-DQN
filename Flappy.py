@@ -198,7 +198,7 @@ class FlappyClass(gym.Env):
         self.time += 1
         if not self.finish:
             self.render()
-        self.clock.tick(30)
+        # self.clock.tick(30)
 
         return self.WriteState(), self.reward, done, {self.finish}
 
